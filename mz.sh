@@ -1,6 +1,6 @@
 #! /bin/bash
 echo "Running mz.py"
 source ~/.virtualenvs/mz/bin/activate
-cd ~/kw/mz/
+cd "$(dirname "$0")"
 python mz.py
 
