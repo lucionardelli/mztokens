@@ -7,7 +7,7 @@ This scripts automagically opens MZ, loads into the site using your own credenti
 You may want to add something like this to your crontab (e.g. using `crontab -e`) to automatically run the script every 10 minutes:
 
     # Look for tokens in MZ events
-    */10 * * * * /home/lucio/kw/mz/mz.sh
+    */10 * * * * /home/user/mztokens/mz.sh
 
 #### IMPORTANT: _ Don't forget to create a `.env` file with the following keys:_
 
