@@ -21,15 +21,16 @@ WEB_EVENTO = "https://www.managerzone.com/?p=event"
 
 ID_USERNAME_INPUT = 'login_username'
 ID_PASSWORD_INPUT = 'login_password'
-ID_BOTON_LOGIN = 'login'
-ID_BOTON_RECLAMAR = 'claim'
-ID_BOTON_CHALLENGE = 'challenge_1'
-ID_BOTON_JUGAR = 'get_it_btn'
+ID_BUTTON_LOGIN = 'login'
+ID_BUTTON_RECLAMAR = 'claim'
+ID_BUTTON_CHALLENGE = 'challenge_1'
+ID_BUTTON_CHALLENGE_5 = 'challenge_5'
+ID_BUTTON_JUGAR = 'get_it_btn'
 ID_TACTICS_SELECT = 'tacticSet'
 TIMEOUT = 10  # We wait for TIMEOUT seconds waiting for pages to load
 
 AUTOMATIC_PLAY = True
-MATCHS_PER_CLAIM = 2
+MATCHS_PER_CLAIM = 5
 AUTOMATIC_PLAY_U18 = False
 USE_TACTIC = None
 
@@ -45,6 +46,8 @@ load_dotenv()
 
 
 def is_button_enabled(button):
+    for klass in button.get_attribute('class').split():
+        print(f"{klass=}")
     return 'buttondiv_disabled' not in button.get_attribute('class').split()
 
 
@@ -75,12 +78,12 @@ def login(driver):
     password_input.clear()
     password_input.send_keys(password)
 
-    login_button = driver.find_element(By.ID, ID_BOTON_LOGIN)
-    login_button.send_keys(Keys.RETURN)
+    login_button = driver.find_element(By.ID, ID_BUTTON_LOGIN)
+    login_button.click()
 
     wait_for_page_to_load(driver, WEB_HOME)
 
-    LOG.debug(f"La current url es: {driver.current_url}.")
+    # LOG.debug(f"La current url es: {driver.current_url}.")
     if driver.current_url != WEB_HOME:
         return False
 
@@ -93,7 +96,8 @@ def go_to_event(driver):
 
 
 def claim_tickets(driver):
-    claim_button = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, ID_BOTON_RECLAMAR)))
+    claim_button = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, ID_BUTTON_RECLAMAR)))
+    time.sleep(10)
     if is_button_enabled(claim_button):
         LOG.debug("QUIERO FLAAAAAAAN!")
         claim_button.send_keys(Keys.RETURN)
@@ -104,16 +108,20 @@ def claim_tickets(driver):
         return False
 
 
-def automatically_play_in_event(driver, use_tactic=None):
+def automatically_play_in_event(driver, use_tactic=None, play_5_special=False):
     # We want a bigge wait time for challenging new teams. A previous match could be taking place!
     WAIT_UNTIL_PREVIOUS_MATCH_ENDS = 60
-    challenge_button = WebDriverWait(driver, WAIT_UNTIL_PREVIOUS_MATCH_ENDS).until(EC.presence_of_element_located((By.ID, ID_BOTON_CHALLENGE)))
-    if is_button_enabled(challenge_button):
+    if play_5_special:
+        button_id = ID_BUTTON_CHALLENGE_5
+    else:
+        button_id = ID_BUTTON_CHALLENGE
+    challenge_button = WebDriverWait(driver, WAIT_UNTIL_PREVIOUS_MATCH_ENDS).until(EC.presence_of_element_located((By.ID, button_id)))
+    if challenge_button.is_enabled():
         LOG.debug("Salen los equipos a la cancha....")
-        challenge_button.send_keys(Keys.RETURN)
+        challenge_button.click()
         time.sleep(2)
-        play_button = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, ID_BOTON_JUGAR)))
-        if is_button_enabled(play_button):
+        play_button = WebDriverWait(driver, TIMEOUT).until(EC.presence_of_element_located((By.ID, ID_BUTTON_JUGAR)))
+        if play_button.is_enabled():
             if use_tactic is not None:
                 tactics = driver.find_element(By.ID, ID_TACTICS_SELECT)
                 # tactics.select_by_visible_text('Banana')
@@ -125,7 +133,7 @@ def automatically_play_in_event(driver, use_tactic=None):
                     LOG.debug("Disculpa mostro, pero no sé qué táctica es %s. Vamos a salir con la default...", use_tactic)
 
             LOG.debug("Ahora juega Booooooca!")
-            play_button.send_keys(Keys.RETURN)
+            play_button.click()
         else:
             LOG.debug("No hay fichines para jugar amistosos!")
     else:
@@ -136,9 +144,9 @@ if __name__ == '__main__':
     options = webdriver.ChromeOptions()
     if HEADLESS:
         options.add_argument("--headless")
-    # NOTE esto debería instalar el chromedriver automágicamente
     # NOTE esto es para utilizar el chromedriver que está descargado en .
     # with webdriver.Chrome(executable_path='./chromedriver', chrome_options=chrome_options) as driver:
+    # NOTE esto debería instalar el chromedriver automágicamente
     with webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options) as driver:
         LOG.debug("Reclamando tickets usando %s", sys.argv[0])
         succesful_login = False
@@ -157,6 +165,14 @@ if __name__ == '__main__':
 
         if got_tickets and AUTOMATIC_PLAY:
             use_tactic = AUTOMATIC_PLAY_U18 and 'u18' or USE_TACTIC or None
-            for i in range(MATCHS_PER_CLAIM):
-                automatically_play_in_event(driver, use_tactic=use_tactic)
+            if MATCHS_PER_CLAIM % 5 == 0:
+                # Play in multiples of 5
+                games_to_play = MATCHS_PER_CLAIM
+                while games_to_play:
+                    LOG.debug("Vamos al mejor de 5 partido' (de un total de %s)", MATCHS_PER_CLAIM)
+                    automatically_play_in_event(driver, use_tactic=use_tactic, play_5_special=True)
+                    games_to_play -= 5
+            else:
+                for i in range(MATCHS_PER_CLAIM):
+                    automatically_play_in_event(driver, use_tactic=use_tactic)
     LOG.debug("Vuelva prontosss")
